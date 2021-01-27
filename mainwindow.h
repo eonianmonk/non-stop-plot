@@ -9,6 +9,9 @@
 //#include <iomanip>
 //#define HEX( x, bytew ) std::setw(bytew*2) << std::setfill('0') << std::hex << (int)( x )
 
+typedef std::unique_ptr<QPair<uint16_t, QPointF*>> tUartPlotData_uqptr;
+typedef QPair<uint16_t, QPointF*> tUart_plotData;
+
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
@@ -29,11 +32,12 @@ private:
     QSerialPort *sport;
     tUart_Decoder *decoder;
     QByteArray *portData;
-    tUart_PACKET *packet;
+    //tUart_PACKET *packet;
 
     uint32_t plotWidth = 10000;
+    uint32_t lpAmount = 0;
+    QVector<tUart_PACKET> data;
 
-    bool updateLock;
     bool oxSliderPressed;
 
     void updatePlot();

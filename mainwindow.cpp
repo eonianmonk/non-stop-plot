@@ -9,9 +9,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     portData = new QByteArray(8, Qt::Initialization());
-    packet = new tUart_PACKET();
+    //packet = new tUart_PACKET();
     decoder = new tUart_Decoder(this);
-    updateLock = true;
 
     //def = new DeviceEventFilter();
 
@@ -74,7 +73,6 @@ void MainWindow::portAvailability()
 
 void MainWindow::portChosen()
 {
-    updateLock = true;
     if(ui->bitrateBox->isEnabled())
     {
         ui->portBox->setEnabled(false);
@@ -108,38 +106,41 @@ void MainWindow::portChosen()
 
         ui->plotDataCleaner->setDisabled(true);
 
+        disconnect(sport, &QSerialPort::readyRead, this, &MainWindow::readData);
+
         delete sport;
     }
 }
 
 void MainWindow::readData()
 {
-    if(sport->bytesAvailable() == 8 )
+    const int packet_size = sizeof(tUart_PACKET);
+    if(sport->bytesAvailable() >= packet_size && sport->bytesAvailable()%packet_size == 0)
     {
+        tUart_PACKET packet_temp;
+        int total_bytes = sport->bytesAvailable();
         *portData = sport->readAll();
-        decoder->decode(portData, packet);
-        if(packet->type == 0xdead || packet->data < 1)
+        for(int i = 0; i < total_bytes/packet_size; i++)
         {
-            qDebug() << "Corrupt packet!";
+            decoder->decode(portData->mid(i*packet_size,packet_size), &packet_temp);
+            data.append(packet_temp);
         }
-        else
+        for(auto& pack : data)
         {
-            std::unique_ptr<QPair<uint16_t, QPointF*>> p(new QPair<uint16_t, QPointF*>(packet->type, new QPointF(packet->time, packet->data)));
+            //qDebug() << pack.time<< pack.data;
+            tUartPlotData_uqptr p(new tUart_plotData(pack.type, new QPointF(pack.time, pack.data)));
             emit this->createPoint(p);
-            updatePlot();
-            this->ui->plotDataCleaner->setEnabled(true);
         }
-    }
-    else if(sport->bytesAvailable() > 8)
-    {
-        if(sport->bytesAvailable()%8 == 0) sport->readAll();
-        return;
+        data.clear();
+        portData->clear();
+
+        updatePlot();
+        this->ui->plotDataCleaner->setEnabled(true);
     }
     else
     {
         qDebug()<< "Not reading: bytes available:" << sport->bytesAvailable();
     }
-    portData->clear();
 }
 
 void MainWindow::hscrolled(int newValue)
@@ -164,6 +165,7 @@ void MainWindow::updatePlot()
         if(!ui->plotScrollBar->isEnabled()) ui->plotScrollBar->setDisabled(false);
 
         if(freeze) ui->plotScrollBar->setValue(pos);
+        //if(freeze) qDebug() << "Outer value:"<< ui->plotScrollBar->value();
         ui->plotScrollBar->setSingleStep(barWidth);
         ui->plotScrollBar->setMaximum(plottingArea);
     }

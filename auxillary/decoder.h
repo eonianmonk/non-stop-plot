@@ -15,7 +15,7 @@ class tUart_Decoder : public QObject
     Q_OBJECT
 public:
     explicit tUart_Decoder(QObject *parent = nullptr);
-    void decode(QByteArray *row_data, tUart_PACKET *packet);
+    void decode(const QByteArray& row_data, tUart_PACKET *packet);
 
 private:
     void inverseQByteArray(QByteArray *array);

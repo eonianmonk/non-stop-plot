@@ -7,13 +7,13 @@
 tUart_Decoder::tUart_Decoder(QObject *parent) : QObject(parent)
 { }
 
-void tUart_Decoder::decode(QByteArray *row_data, tUart_PACKET *packet)
+void tUart_Decoder::decode(const QByteArray& row_data, tUart_PACKET *packet)
 {
     //this->inverseQByteArray(row_data); //size = 8
     //memcpy(packet, &row_data->data()[0],8); // don't know how to fit it :(
-    memcpy(&packet->type,&row_data->data()[0],2);
-    memcpy(&packet->data,&row_data->data()[2],2);
-    memcpy(&packet->time,&row_data->data()[4],4);
+    memcpy(&packet->type,&row_data.data()[0],2);
+    memcpy(&packet->data,&row_data.data()[2],2);
+    memcpy(&packet->time,&row_data.data()[4],4);
 
     // corrupt packet
     if(packet->type != 1 && packet->type != 0)
@@ -21,9 +21,9 @@ void tUart_Decoder::decode(QByteArray *row_data, tUart_PACKET *packet)
         packet->type = 0xdead;
 
 #ifdef QT_DEBUG
-        for(int i = 0;i<row_data->size();i++)
+        for(int i = 0;i<row_data.size();i++)
         {
-            qDebug() << hex << (uint16_t)row_data->data()[i];
+            qDebug() << hex << (uint16_t)row_data.data()[i];
         }
 #endif
     }

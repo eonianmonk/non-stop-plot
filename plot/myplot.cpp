@@ -13,6 +13,8 @@ void MyPlot::init(uint32_t hr, uint32_t vr, uint32_t tt)
     }
     else plottingRange = hr*3;
 
+    plottingRange -= hr;
+
     approximationAreaV = hRange/130;
     approximationAreaH = vRange/130;
 
@@ -345,14 +347,6 @@ unique_rng_ptr MyPlot::actuallyFindOYRange(QCPGraphDataContainer::const_iterator
     unique_rng_ptr oyrange(new QCPRange());
     if(begin != end)
     {
-        ///....
-        int c = 0;
-        if(begin->value < 1 || (end-1)->value < 1)
-        {
-            c = 2+3;
-        }
-        if(c == 5) qDebug()<<c;
-        ///
         oyrange->lower = std::min_element(begin, end, [](QCPGraphData a, QCPGraphData b)
             { return a.value < b.value; } )->value;
 
@@ -467,14 +461,6 @@ void MyPlot::addPoint(std::unique_ptr<QPair<uint16_t, QPointF*>> &pData)
     {
         return;
     }
-    if(pData->second->x() > XRange.upper)
-    {
-        XRange.upper = pData->second->x();
-    }
-    if(pData->second->x() < XRange.lower)
-    {
-        XRange.lower = pData->second->x();
-    }
     if(!graphs.keys().contains(pData->first))
     {
         graphs[pData->first] = QSharedPointer<QCPGraphDataContainer>(new QCPGraphDataContainer());
@@ -528,11 +514,8 @@ void MyPlot::plotPress(QMouseEvent* e)
 // 3 - total ox sb width
 bool MyPlot::mreplot(int32_t& psbvalue, int32_t& psbpage_step, int32_t& psbwidth)
 {
-    if(!freeze) psbvalue = -1;
-    psbpage_step = -1;
-    psbwidth = -1;
     // assuming data is ordered
-    double minx = std::numeric_limits<double>::max(), maxx = 00;
+    double minx = std::numeric_limits<double>::max(), maxx = 0;
     bool to_resize_oy = true;
     for(auto& key : graphs.keys())
     {
@@ -547,12 +530,11 @@ bool MyPlot::mreplot(int32_t& psbvalue, int32_t& psbpage_step, int32_t& psbwidth
         if(maxx != minx) std::swap(minx, maxx);
         psbvalue = 0;
     }
-
     //setting ox step
-    psbpage_step = plottingRange/hRange;
+    psbpage_step = hRange;
     // setting scrollbar width
-    psbwidth = maxx - minx;
-    psbwidth = static_cast<uint32_t>(psbwidth) > plottingRange ? plottingRange : psbwidth;
+    psbwidth = maxx - minx - psbpage_step;
+    psbwidth = static_cast<uint32_t>(psbwidth) > (plottingRange-hRange)? plottingRange-hRange : psbwidth;
 
     if(!freeze)
     {
@@ -576,36 +558,44 @@ bool MyPlot::mreplot(int32_t& psbvalue, int32_t& psbpage_step, int32_t& psbwidth
         }
         psbvalue = psbwidth;
     }
-    else // totally broken
+    else // not that broken
     {
         // if cursor position is at lowest position move range so
         // that scrollbar(and position) stays the same, but plot is moved
         // define if scrollbar at lowest position
         double plotStart = maxx - (XRange.size() > plottingRange ? plottingRange : XRange.size());
-        double delta = maxx - xAxis->range().upper;
 
         if(xAxis->range().lower <= plotStart)
         {
-            xAxis->setRange(plotStart + delta, plotStart + hRange + delta);
+            xAxis->setRange(plotStart, plotStart + hRange);
             psbvalue = 0;
         }
         // at right edge - unfreeze
-        //else if()
+        else if(xAxis->range().upper + psbwidth/100 >= maxx)
+        {
+            freeze = false;
+            psbvalue = psbwidth;
+
+        }
         // scrollbar at any other non-edge position
         else
         {
-            // do not change xaxis, just scrtollbar values
-            //psbvalue = maxx - xAxis->range().lower;
+            double delta = maxx - XRange.upper;
             to_resize_oy = false;
+            // do not change xaxis, just scrtollbar value
+            psbvalue = static_cast<uint32_t>(psbvalue -  delta) % psbwidth;
+            if(psbvalue < 0) psbvalue = 0;
         }
     }
+    XRange.lower = minx;
+    XRange.upper = maxx;
     // axelerate oy
     if(to_resize_oy)
     {
         resizeOY(xAxis->range());
-        if(!pressLocked) replot();
     }
-    return !freeze;
+    replot();
+    return freeze;
 }
 
 void MyPlot::plotHorizontalScrollBarValueChange(int newValue)
@@ -623,11 +613,13 @@ void MyPlot::plotHorizontalScrollBarValueChange(int newValue)
     // replotting & rescaling OY
     resizeOY(xAxis->range());
     replot();
-    qDebug() << newValue<<": Xrange:"<<xAxis->range()<<": Yrange:"<<yAxis->range();
+    //qDebug() << newValue<<": Xrange:"<<xAxis->range()<<": Yrange:"<<yAxis->range();
 }
 
 void MyPlot::rangeChanged(int newRange)
 {
+    if(plottingRange < static_cast<uint32_t>(newRange)*2)
+        plottingRange += newRange*2;
     hRange = newRange;
 }
 
